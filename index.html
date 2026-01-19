@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Visualisation de Données : Gratte-ciels</title>
+    <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; }
+        h1 { text-align: center; color: #333; }
+        .container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); width: 100%; }
+        .viz-box { width: 100%; overflow-x: auto; text-align: center; min-height: 400px; display: flex; align-items: center; justify-content: center; }
+        img { max-width: 100%; height: auto; border: 1px solid #ddd; }
+        .error-msg { color: red; font-weight: bold; padding: 20px; background: #ffeeee; border: 1px solid red; border-radius: 5px; }
+        .loading { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <h1>Projet Data Viz : Les Gratte-ciels (>300m)</h1>
+
+    <div class="container">
+        
+        <div class="card">
+            <h2>1. Visualisation Dynamique (JS + SPARQL)</h2>
+            <p>Données récupérées en direct depuis Wikidata.</p>
+            <div id="vis" class="viz-box">
+                <span class="loading">Chargement des données depuis Wikidata...</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>2. Visualisation Statique (RAWGraphs)</h2>
+            <p>Image exportée (Date vs Étages).</p>
+            <div class="viz-box" style="display: block;">
+                <img src="viz.png" alt="Graphique RAWGraphs" onerror="this.style.display='none'; this.parentElement.innerHTML += '<br>Image viz.png introuvable.'">
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 1. La requête SPARQL
+        const sparqlQuery = `
+            SELECT DISTINCT ?item ?itemLabel ?hauteur ?etages ?dateConstruction ?paysLabel ?image WHERE {
+              ?item wdt:P31/wdt:P279* wd:Q11303;
+                    wdt:P2048 ?hauteur;
+                    wdt:P17 ?pays.
+              FILTER(?hauteur > 300)
+              OPTIONAL { ?item wdt:P1101 ?etages. }
+              OPTIONAL { ?item wdt:P571 ?dateConstruction. }
+              OPTIONAL { ?item wdt:P18 ?image. }
+              SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en,fr". }
+            }
+            LIMIT 150
+        `;
+
+        async function loadDataAndRender() {
+            const url = "https://query.wikidata.org/sparql?format=json&query=" + encodeURIComponent(sparqlQuery);
+
+            try {
+                // A. Téléchargement
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+                const rawData = await response.json();
+
+                // B. Nettoyage ROBUSTE
+                const cleanData = rawData.results.bindings
+                    .filter(row => row.hauteur && row.dateConstruction)
+                    .map(row => {
+                        // Extraction sécurisée de l'année (4 premiers caractères)
+                        // Ex: "2010-01-01T..." devient le nombre 2010
+                        const yearStr = row.dateConstruction.value.substring(0, 4);
+                        const yearNum = parseInt(yearStr);
+
+                        return {
+                            nom: row.itemLabel ? row.itemLabel.value : "Inconnu",
+                            hauteur: parseFloat(row.hauteur.value),
+                            etages: row.etages ? parseInt(row.etages.value) : 10,
+                            annee: yearNum, // On stocke un NOMBRE (ex: 2010), pas une DATE
+                            pays: row.paysLabel ? row.paysLabel.value : "Monde",
+                            image: row.image ? row.image.value : null
+                        };
+                    })
+                    // Filtre supplémentaire pour éliminer les années invalides (NaN)
+                    .filter(row => !isNaN(row.annee) && row.annee > 1900 && row.annee < 2030);
+
+                console.log("Données chargées et nettoyées :", cleanData.length, "lignes");
+
+                if (cleanData.length === 0) throw new Error("Aucune donnée valide trouvée.");
+
+                // C. Configuration du graphique
+                const spec = {
+                    "$schema": "https://vega.github.net/schema/vega-lite/v5.json",
+                    "width": "container",
+                    "height": 400,
+                    "data": { "values": cleanData },
+                    "mark": { "type": "circle", "opacity": 0.6, "stroke": "#333", "strokeWidth": 1 },
+                    "encoding": {
+                        "x": { 
+                            "field": "annee", 
+                            "type": "quantitative", // CHANGEMENT : On traite l'année comme un nombre (quantitatif)
+                            "title": "Année de Construction",
+                            "scale": { "zero": false }, // Ne pas commencer l'axe à 0
+                            "axis": { "format": "d" }   // Format "d" (decimal) pour afficher "2020" sans virgule (pas "2,020")
+                        },
+                        "y": { 
+                            "field": "hauteur", 
+                            "type": "quantitative", 
+                            "title": "Hauteur (mètres)",
+                            "scale": { "zero": false, "padding": 20 }
+                        },
+                        "size": { 
+                            "field": "etages", 
+                            "type": "quantitative", 
+                            "title": "Étages",
+                            "scale": { "range": [50, 1000] }
+                        },
+                        "color": { 
+                            "field": "pays", 
+                            "type": "nominal", 
+                            "title": "Pays"
+                        },
+                        "tooltip": [
+                            {"field": "nom", "title": "Nom"},
+                            {"field": "hauteur", "title": "Hauteur (m)"},
+                            {"field": "annee", "title": "Année"}, // Plus besoin de format date ici
+                            {"field": "pays", "title": "Pays"}
+                        ]
+                    }
+                };
+
+                // D. Affichage
+                document.getElementById('vis').innerHTML = "";
+                vegaEmbed('#vis', spec, {actions: false});
+
+            } catch (error) {
+                console.error("Erreur critique :", error);
+                document.getElementById('vis').innerHTML = 
+                    `<div class='error-msg'>Erreur : ${error.message}</div>`;
+            }
+        }
+
+        loadDataAndRender();
+    </script>
+</body>
+</html>
