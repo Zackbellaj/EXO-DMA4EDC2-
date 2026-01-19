@@ -36,7 +36,8 @@
             <h2>2. Visualisation Statique (RAWGraphs)</h2>
             <p>Image exportée (Date vs Étages).</p>
             <div class="viz-box" style="display: block;">
-                <img src="viz.png" alt="Graphique RAWGraphs" onerror="this.style.display='none'; this.parentElement.innerHTML += '<br>Image viz.png introuvable.'">
+                            <iframe style="width: 80vw; height: 50vh; border: none;" src="https://query.wikidata.org/embed.html#SELECT%20DISTINCT%20%3Fitem%20%3FitemLabel%20%3Fhauteur%20%3Fetages%20%3Fannee%20%3FpaysLabel%20%3Fimage%20WHERE%20%7B%0A%20%20%3Fitem%20wdt%3AP31%2Fwdt%3AP279*%20wd%3AQ11303%3B%20%20%20%20%20%20%0A%20%20%20%20%20%20%20%20wdt%3AP2048%20%3Fhauteur%3B%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%0A%20%20%20%20%20%20%20%20wdt%3AP17%20%3Fpays.%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%0A%20%20%0A%20%20FILTER(%3Fhauteur%20%3E%20300)%0A%0A%20%20OPTIONAL%20%7B%20%3Fitem%20wdt%3AP1101%20%3Fetages.%20%7D%0A%20%20%0A%20%20%23%20ICI%20%3A%20On%20r%C3%A9cup%C3%A8re%20la%20date%20(%3Fd)%20et%20on%20la%20convertit%20en%20Ann%C3%A9e%20(%3Fannee)%0A%20%20OPTIONAL%20%7B%20%0A%20%20%20%20%3Fitem%20wdt%3AP571%20%3Fd.%20%0A%20%20%20%20BIND(YEAR(%3Fd)%20AS%20%3Fannee)%20%0A%20%20%7D%0A%20%20%0A%20%20OPTIONAL%20%7B%20%3Fitem%20wdt%3AP18%20%3Fimage.%20%7D%20%20%20%20%20%20%20%20%20%20%0A%20%20%0A%20%20SERVICE%20wikibase%3Alabel%20%7B%20bd%3AserviceParam%20wikibase%3Alanguage%20%22%5BAUTO_LANGUAGE%5D%2Cen%2Cfr%22.%20%7D%0A%7D%0AORDER%20BY%20DESC(%3Fhauteur)%0ALIMIT%20100" referrerpolicy="origin" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+
             </div>
         </div>
 
